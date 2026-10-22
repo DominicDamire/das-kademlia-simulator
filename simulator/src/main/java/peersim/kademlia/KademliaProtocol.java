@@ -1,16 +1,19 @@
+/*
+ * Decompiled with CFR 0.152.
+ */
 package peersim.kademlia;
 
-/**
- * A Kademlia implementation for PeerSim extending the EDProtocol class.<br>
- * See the Kademlia bibliografy for more information about the protocol.
- *
- * @author Daniele Furlan, Maurizio Bonani
- * @version 1.0
- */
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
-// logging
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.TreeMap;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
@@ -23,511 +26,659 @@ import peersim.core.Network;
 import peersim.core.Node;
 import peersim.edsim.EDProtocol;
 import peersim.edsim.EDSimulator;
+import peersim.kademlia.KademliaCommonConfig;
+import peersim.kademlia.KademliaNode;
+import peersim.kademlia.KademliaObserver;
+import peersim.kademlia.KeyValueStore;
+import peersim.kademlia.Message;
+import peersim.kademlia.RoutingTable;
+import peersim.kademlia.SimpleEvent;
+import peersim.kademlia.Timeout;
+import peersim.kademlia.Util;
 import peersim.kademlia.operations.FindOperation;
 import peersim.kademlia.operations.GetOperation;
 import peersim.kademlia.operations.PutOperation;
 import peersim.transport.UnreliableTransport;
 
-// __________________________________________________________________________________________________
-public class KademliaProtocol implements Cloneable, EDProtocol {
+public class KademliaProtocol
+implements Cloneable,
+EDProtocol {
+    final String PAR_K = "K";
+    final String PAR_ALPHA = "ALPHA";
+    final String PAR_BITS = "BITS";
+    final String PAR_FINDMODE = "FINDMODE";
+    private static final String PAR_TRANSPORT = "transport";
+    private static String prefix = null;
+    private UnreliableTransport transport;
+    private int tid;
+    private int kademliaid;
+    private static boolean _ALREADY_INSTALLED = false;
+    private RoutingTable routingTable;
+    private TreeMap<Long, Long> sentMsg;
+    private LinkedHashMap<Long, FindOperation> findOp;
+    public KademliaNode node = null;
+    protected Logger logger;
+    private Map<BigInteger, Integer> chunkRetryIndex = new HashMap<BigInteger, Integer>();
+    private final HashMap<BigInteger, Boolean> retrievedChunks = new HashMap();
+    private KeyValueStore kv;
+    public int chunkSize = 1024;
+    private double totalExpectedAcks = 0.0;
+    private int receivedAcks = 0;
+    private long putOperationStartTime = -1L;
+    private BigInteger currentPutFileKey = null;
+    private long chunkStartTime = -1L;
+    private int requiredChunkCount = 1;
+    private List<BigInteger> targetChunks = new ArrayList<BigInteger>();
+    Map<Long, Long> findStartTimeMap = new HashMap<Long, Long>();
 
-  // VARIABLE PARAMETERS
-  final String PAR_K = "K";
-  final String PAR_ALPHA = "ALPHA";
-  final String PAR_BITS = "BITS";
-  final String PAR_FINDMODE = "FINDMODE";
-
-  private static final String PAR_TRANSPORT = "transport";
-  private static String prefix = null;
-  private UnreliableTransport transport;
-  private int tid;
-  private int kademliaid;
-
-  /** allow to call the service initializer only once */
-  private static boolean _ALREADY_INSTALLED = false;
-
-  /** routing table of this pastry node */
-  private RoutingTable routingTable;
-
-  /** trace message sent for timeout purpose */
-  private TreeMap<Long, Long> sentMsg;
-
-  /** find operations set */
-  private LinkedHashMap<Long, FindOperation> findOp;
-
-  /** Kademlia node instance */
-  public KademliaNode node;
-
-  /** logging handler */
-  protected Logger logger;
-
-  private KeyValueStore kv;
-
-  /**
-   * Replicate this object by returning an identical copy.<br>
-   * It is called by the initializer and do not fill any particular field.
-   *
-   * @return Object
-   */
-  public Object clone() {
-    KademliaProtocol dolly = new KademliaProtocol(KademliaProtocol.prefix);
-    return dolly;
-  }
-
-  /**
-   * Used only by the initializer when creating the prototype. Every other instance call CLONE to
-   * create the new object.
-   *
-   * @param prefix String
-   */
-  public KademliaProtocol(String prefix) {
-    this.node = null; // empty nodeId
-    KademliaProtocol.prefix = prefix;
-
-    _init();
-
-    routingTable =
-        new RoutingTable(
-            KademliaCommonConfig.NBUCKETS,
-            KademliaCommonConfig.K,
-            KademliaCommonConfig.MAXREPLACEMENT);
-
-    sentMsg = new TreeMap<Long, Long>();
-
-    findOp = new LinkedHashMap<Long, FindOperation>();
-
-    tid = Configuration.getPid(prefix + "." + PAR_TRANSPORT);
-
-    kv = new KeyValueStore();
-  }
-
-  /**
-   * This procedure is called only once and allow to inizialize the internal state of
-   * KademliaProtocol. Every node shares the same configuration, so it is sufficient to call this
-   * routine once.
-   */
-  private void _init() {
-    // execute once
-    if (_ALREADY_INSTALLED) return;
-
-    // read paramaters
-    KademliaCommonConfig.K = Configuration.getInt(prefix + "." + PAR_K, KademliaCommonConfig.K);
-    KademliaCommonConfig.ALPHA =
-        Configuration.getInt(prefix + "." + PAR_ALPHA, KademliaCommonConfig.ALPHA);
-    KademliaCommonConfig.BITS =
-        Configuration.getInt(prefix + "." + PAR_BITS, KademliaCommonConfig.BITS);
-
-    KademliaCommonConfig.FINDMODE =
-        Configuration.getInt(prefix + "." + PAR_FINDMODE, KademliaCommonConfig.FINDMODE);
-
-    _ALREADY_INSTALLED = true;
-  }
-
-  /**
-   * Search through the network the Node having a specific node Id, by performing binary serach (we
-   * concern about the ordering of the network).
-   *
-   * @param searchNodeId BigInteger
-   * @return Node
-   */
-  private Node nodeIdtoNode(BigInteger searchNodeId) {
-    if (searchNodeId == null) return null;
-
-    int inf = 0;
-    int sup = Network.size() - 1;
-    int m;
-
-    while (inf <= sup) {
-      m = (inf + sup) / 2;
-
-      BigInteger mId =
-          ((KademliaProtocol) Network.get(m).getProtocol(kademliaid)).getNode().getId();
-
-      if (mId.equals(searchNodeId)) return Network.get(m);
-
-      if (mId.compareTo(searchNodeId) < 0) inf = m + 1;
-      else sup = m - 1;
+    @Override
+    public Object clone() {
+        KademliaProtocol dolly = new KademliaProtocol(prefix);
+        return dolly;
     }
 
-    // perform a traditional search for more reliability (maybe the network is not ordered)
-    BigInteger mId;
-    for (int i = Network.size() - 1; i >= 0; i--) {
-      mId = ((KademliaProtocol) Network.get(i).getProtocol(kademliaid)).getNode().getId();
-      if (mId.equals(searchNodeId)) return Network.get(i);
+    public KademliaProtocol(String prefix) {
+        KademliaProtocol.prefix = prefix;
+        this._init();
+        this.routingTable = new RoutingTable(KademliaCommonConfig.NBUCKETS, KademliaCommonConfig.K, KademliaCommonConfig.MAXREPLACEMENT);
+        this.sentMsg = new TreeMap();
+        this.findOp = new LinkedHashMap();
+        this.tid = Configuration.getPid(prefix + ".transport");
+        this.kv = new KeyValueStore();
     }
 
-    return null;
-  }
-
-  /**
-   * Perform the required operation upon receiving a message in response to a ROUTE message.<br>
-   * Update the find operation record with the closest set of neighbour received. Than, send as many
-   * ROUTE request I can (according to the ALPHA parameter).<br>
-   * If no closest neighbour available and no outstanding messages stop the find operation.
-   *
-   * @param m Message
-   * @param myPid the sender Pid
-   */
-  private void handleResponse(Message m, int myPid) {
-    // add message source to my routing table
-    if (m.src != null) {
-      routingTable.addNeighbour(m.src.getId());
+    private void _init() {
+        if (_ALREADY_INSTALLED) {
+            return;
+        }
+        KademliaCommonConfig.K = Configuration.getInt(prefix + ".K", KademliaCommonConfig.K);
+        KademliaCommonConfig.ALPHA = Configuration.getInt(prefix + ".ALPHA", KademliaCommonConfig.ALPHA);
+        KademliaCommonConfig.BITS = Configuration.getInt(prefix + ".BITS", KademliaCommonConfig.BITS);
+        KademliaCommonConfig.FINDMODE = Configuration.getInt(prefix + ".FINDMODE", KademliaCommonConfig.FINDMODE);
+        _ALREADY_INSTALLED = true;
     }
 
-    // get corresponding find operation (using the message field operationId)
-    FindOperation fop = this.findOp.get(m.operationId);
-
-    if (fop != null) {
-      fop.elaborateResponse((BigInteger[]) m.body);
-
-      logger.info("Handleresponse FindOperation " + fop.getId() + " " + fop.getAvailableRequests());
-      // save received neighbour in the closest Set of fin operation
-
-      BigInteger[] neighbours = (BigInteger[]) m.body;
-      for (BigInteger neighbour : neighbours) routingTable.addNeighbour(neighbour);
-
-      if (!fop.isFinished() && Arrays.asList(neighbours).contains(fop.getDestNode())) {
-        logger.warning("Found node " + fop.getDestNode());
-
-        KademliaObserver.find_ok.add(1);
-        fop.setFinished(true);
-      }
-
-      if (fop instanceof GetOperation && m.value != null) {
-        fop.setFinished(true);
-        ((GetOperation) fop).setValue(m.value);
-        logger.warning(
-            "Getprocess finished found " + ((GetOperation) fop).getValue() + " hops " + fop.nrHops);
-      }
-
-      while (fop.getAvailableRequests() > 0) { // I can send a new find request
-
-        // get an available neighbour
-        BigInteger neighbour = fop.getNeighbour();
-
-        if (neighbour != null) {
-          if (!fop.isFinished()) {
-            // create a new request to send to neighbour
-            Message request;
-            if (fop instanceof GetOperation) request = new Message(Message.MSG_GET);
-            else if (KademliaCommonConfig.FINDMODE == 0) request = new Message(Message.MSG_FIND);
-            else request = new Message(Message.MSG_FIND_DIST);
-            request.operationId = m.operationId;
-            request.src = this.getNode();
-            request.dst = nodeIdtoNode(neighbour).getKademliaProtocol().getNode();
-            if (KademliaCommonConfig.FINDMODE == 0 || request.getType() == Message.MSG_GET)
-              request.body = fop.getDestNode();
-            else request.body = Util.logDistance(fop.getDestNode(), (BigInteger) fop.getBody());
-            // increment hop count
-            fop.nrHops++;
-
-            // send find request
-            sendMessage(request, neighbour, myPid);
-          }
-        } else if (fop.getAvailableRequests()
-            == KademliaCommonConfig.ALPHA) { // no new neighbour and no outstanding requests
-          // search operation finished
-
-          if (fop instanceof PutOperation) {
-            for (BigInteger id : fop.getNeighboursList()) {
-              // create a put request
-              Message request = new Message(Message.MSG_PUT);
-              request.operationId = m.operationId;
-              request.src = this.getNode();
-              request.dst = nodeIdtoNode(id).getKademliaProtocol().getNode();
-              request.body = ((PutOperation) fop).getBody();
-              request.value = ((PutOperation) fop).getValue();
-              // increment hop count
-              fop.nrHops++;
-              sendMessage(request, id, myPid);
+    private Node nodeIdtoNode(BigInteger searchNodeId) {
+        BigInteger mId;
+        if (searchNodeId == null) {
+            return null;
+        }
+        int inf = 0;
+        int sup = Network.size() - 1;
+        while (inf <= sup) {
+            int m = (inf + sup) / 2;
+            mId = ((KademliaProtocol)Network.get(m).getProtocol(this.kademliaid)).getNode().getId();
+            if (mId.equals(searchNodeId)) {
+                return Network.get(m);
             }
-            logger.warning("Sending PUT_VALUE to " + fop.getNeighboursList().size() + " nodes");
-          } else if (fop instanceof GetOperation) {
-            findOp.remove(fop.getId());
-            logger.warning("Getprocess finished not found ");
-
-          } else {
-            findOp.remove(fop.getId());
-          }
-
-          if (fop.getBody().equals("Automatically Generated Traffic")
-              && fop.getClosest().containsKey(fop.getDestNode())) {
-            // update statistics
-            long timeInterval = (CommonState.getTime()) - (fop.getTimestamp());
-            KademliaObserver.timeStore.add(timeInterval);
-            KademliaObserver.hopStore.add(fop.nrHops);
-            KademliaObserver.msg_deliv.add(1);
-          }
-
-          return;
-
-        } else { // no neighbour available but exists oustanding request to wait
-          return;
+            if (mId.compareTo(searchNodeId) < 0) {
+                inf = m + 1;
+                continue;
+            }
+            sup = m - 1;
         }
-      }
-    } else {
-      System.err.println("There has been some error in the protocol");
-    }
-  }
-
-  /**
-   * Response to a put request.<br>
-   * Store the object in the key value store
-   *
-   * @param m Message
-   * @param myPid the sender Pid
-   */
-  private void handlePut(Message m, int myPid) {
-    kv.add((BigInteger) m.body, m.value);
-  }
-
-  /**
-   * Response to a route request.<br>
-   * Find the ALPHA closest node consulting the k-buckets and return them to the sender.
-   *
-   * @param m Message
-   * @param myPid the sender Pid
-   */
-  private void handleFind(Message m, int myPid) {
-    // get the ALPHA closest node to destNode
-
-    logger.info("handleFind received from " + m.src.getId() + " " + m.operationId);
-
-    BigInteger[] neighbours = new BigInteger[KademliaCommonConfig.K];
-    if (m.getType() == Message.MSG_FIND || m.getType() == Message.MSG_GET) {
-      neighbours = this.routingTable.getNeighbours((BigInteger) m.body, m.src.getId());
-    } else if (m.getType() == Message.MSG_FIND_DIST) {
-      neighbours = this.routingTable.getNeighbours((int) m.body);
-    } else {
-      return;
-    }
-
-    // for (BigInteger neigh : neighbours) logger.warning("Neighbours " + neigh);
-    // create a response message containing the neighbours (with the same id of the request)
-    Message response = new Message(Message.MSG_RESPONSE, neighbours);
-    response.operationId = m.operationId;
-    response.dst = m.dst;
-    response.src = this.getNode();
-    response.ackId = m.id; // set ACK number
-
-    if (m.getType() == Message.MSG_GET) {
-      response.value = kv.get((BigInteger) m.body);
-    }
-    // send back the neighbours to the source of the message
-    sendMessage(response, m.src.getId(), myPid);
-  }
-
-  /**
-   * Start a find node opearation.<br>
-   * Find the ALPHA closest node and send find request to them.
-   *
-   * @param m Message received (contains the node to find)
-   * @param myPid the sender Pid
-   */
-  private void handleInit(Message m, int myPid) {
-
-    logger.info("handleInitFind " + (BigInteger) m.body);
-    KademliaObserver.find_op.add(1);
-
-    // create find operation and add to operations array
-    // FindOperation fop = new FindOperation(m.dest, m.timestamp);
-
-    FindOperation fop;
-    switch (m.type) {
-      case Message.MSG_INIT_FIND:
-        fop = new FindOperation(this.node.getId(), (BigInteger) m.body, m.timestamp);
-        break;
-      case Message.MSG_INIT_GET:
-        fop = new GetOperation(this.node.getId(), (BigInteger) m.body, m.timestamp);
-        break;
-      case Message.MSG_INIT_PUT:
-        fop = new PutOperation(this.node.getId(), (BigInteger) m.body, m.timestamp);
-        ((PutOperation) fop).setValue(m.value);
-        break;
-      default:
-        fop = new FindOperation(this.node.getId(), (BigInteger) m.body, m.timestamp);
-        break;
-    }
-
-    fop.setBody(m.body);
-    findOp.put(fop.getId(), fop);
-
-    // get the ALPHA closest node to srcNode and add to find operation
-    BigInteger[] neighbours =
-        this.routingTable.getNeighbours((BigInteger) m.body, this.getNode().getId());
-    fop.elaborateResponse(neighbours);
-    fop.setAvailableRequests(KademliaCommonConfig.ALPHA);
-    // set message operation id
-    m.operationId = fop.getId();
-
-    m.src = this.getNode();
-
-    // send ALPHA messages
-    for (int i = 0; i < KademliaCommonConfig.ALPHA; i++) {
-      BigInteger nextNode = fop.getNeighbour();
-      if (nextNode != null) {
-        m.dst =
-            nodeIdtoNode(nextNode).getKademliaProtocol().getNode(); // new KademliaNode(nextNode);
-        // set message type depending on find mode
-        if (m.type == Message.MSG_INIT_GET) m.type = Message.MSG_GET;
-        else if (KademliaCommonConfig.FINDMODE == 0) m.type = Message.MSG_FIND;
-        else {
-          m.type = Message.MSG_FIND_DIST;
-          m.body = Util.logDistance(nextNode, (BigInteger) fop.getBody());
+        int i = Network.size() - 1;
+        while (i >= 0) {
+            mId = ((KademliaProtocol)Network.get(i).getProtocol(this.kademliaid)).getNode().getId();
+            if (mId.equals(searchNodeId)) {
+                return Network.get(i);
+            }
+            --i;
         }
-
-        logger.info("sendMessage to " + nextNode);
-
-        sendMessage(m.copy(), nextNode, myPid);
-        fop.nrHops++;
-      }
-    }
-  }
-
-  /**
-   * send a message with current transport layer and starting the timeout timer (wich is an event)
-   * if the message is a request
-   *
-   * @param m the message to send
-   * @param destId the Id of the destination node
-   * @param myPid the sender Pid
-   */
-  public void sendMessage(Message m, BigInteger destId, int myPid) {
-    // add destination to routing table
-    this.routingTable.addNeighbour(destId);
-    // int destpid;
-    assert m.src != null;
-    assert m.dst != null;
-
-    Node src = nodeIdtoNode(this.getNode().getId());
-    Node dest = nodeIdtoNode(destId);
-
-    // destpid = dest.getKademliaProtocol().getProtocolID();
-
-    transport = (UnreliableTransport) (Network.prototype).getProtocol(tid);
-    transport.send(src, dest, m, kademliaid);
-
-    if (m.getType() == Message.MSG_FIND || m.getType() == Message.MSG_FIND_DIST) { // is a request
-      Timeout t = new Timeout(destId, m.id, m.operationId);
-      long latency = transport.getLatency(src, dest);
-
-      // add to sent msg
-      this.sentMsg.put(m.id, m.timestamp);
-      EDSimulator.add(4 * latency, t, src, myPid); // set delay = 2*RTT
-    }
-  }
-
-  /**
-   * manage the peersim receiving of the events
-   *
-   * @param myNode Node
-   * @param myPid int
-   * @param event Object
-   */
-  public void processEvent(Node myNode, int myPid, Object event) {
-
-    // Parse message content Activate the correct event manager fot the particular event
-    this.kademliaid = myPid;
-
-    Message m;
-    if (event instanceof Message) {
-      m = (Message) event;
-      KademliaObserver.reportMsg(m, false);
+        return null;
     }
 
-    switch (((SimpleEvent) event).getType()) {
-      case Message.MSG_RESPONSE:
-        m = (Message) event;
-        sentMsg.remove(m.ackId);
-        handleResponse(m, myPid);
-        break;
-
-      case Message.MSG_INIT_FIND:
-      case Message.MSG_INIT_GET:
-      case Message.MSG_INIT_PUT:
-        m = (Message) event;
-        handleInit(m, myPid);
-        break;
-
-      case Message.MSG_FIND:
-      case Message.MSG_FIND_DIST:
-      case Message.MSG_GET:
-        m = (Message) event;
-        handleFind(m, myPid);
-        break;
-
-      case Message.MSG_PUT:
-        m = (Message) event;
-        handlePut(m, myPid);
-        break;
-
-      case Message.MSG_EMPTY:
-        // TO DO
-        break;
-
-      case Message.MSG_STORE:
-        // TO DO
-        break;
-
-        /*case Timeout.TIMEOUT: // timeout
-        Timeout t = (Timeout) event;
-        if (sentMsg.containsKey(t.msgID)) { // the response msg isn't arrived
-          // remove form sentMsg
-          sentMsg.remove(t.msgID);
-          // remove node from my routing table
-          this.routingTable.removeNeighbour(t.node);
-          // remove from closestSet of find operation
-          this.findOp.get(t.opID).closestSet.remove(t.node);
-          // try another node
-          Message m1 = new Message();
-          m1.operationId = t.opID;
-          m1.src = getNode();
-          m1.dest = this.findOp.get(t.opID).destNode;
-          this.handleResponse(m1, myPid);
+    private void handleResponse(Message m, int myPid) {
+        FindOperation fop;
+        if (m.src != null) {
+            this.routingTable.addNeighbour(m.src.getId());
         }
-        break;*/
+        if ((fop = this.findOp.get(m.operationId)) != null) {
+            BigInteger[] neighbours2;
+            GetOperation getOp;
+            BigInteger neighbour;
+            BigInteger[] neighbours;
+            fop.elaborateResponse((BigInteger[])m.body);
+            this.logger.info("Handleresponse FindOperation " + fop.getId() + " " + fop.getAvailableRequests());
+            BigInteger[] bigIntegerArray = neighbours = (BigInteger[])m.body;
+            int n = neighbours.length;
+            int n2 = 0;
+            while (n2 < n) {
+                neighbour = bigIntegerArray[n2];
+                this.routingTable.addNeighbour(neighbour);
+                ++n2;
+            }
+            if (!fop.isFinished() && Arrays.asList(neighbours).contains(fop.getDestNode())) {
+                this.logger.warning("Found node " + String.valueOf(fop.getDestNode()));
+                KademliaObserver.find_ok.add(1.0);
+                fop.setFinished(true);
+            }
+            if (fop instanceof GetOperation && m.value instanceof byte[]) {
+                getOp = (GetOperation)fop;
+                BigInteger chunkKey = (BigInteger)getOp.getBody();
+                this.retrievedChunks.put(chunkKey, true);
+                getOp.setValue(m.value);
+                fop.setFinished(true);
+                if (this.retrievedChunks.size() >= this.requiredChunkCount) {
+                    long totalTime = CommonState.getTime() - this.chunkStartTime;
+                    System.out.println("[GET] \ud83c\udf89 Sufficient chunks retrieved! Stopping.");
+                    System.out.println("GET operation took " + totalTime + " time units.");
+                    KademliaObserver.getTimeStore.add(totalTime);
+                    KademliaObserver.hopStore.add(fop.nrHops);
+                    fop.setFinished(true);
+                    this.retrievedChunks.clear();
+                }
+                return;
+            }
+            if (m.value == null && m.type == 18) {
+                List<BigInteger> neighbours3;
+                getOp = (GetOperation)fop;
+                BigInteger chunkKey = (BigInteger)getOp.getBody();
+                int retryIndex = this.chunkRetryIndex.getOrDefault(chunkKey, 0);
+                if (retryIndex < (neighbours3 = fop.getNeighboursList()).size()) {
+                    BigInteger nextNodeId = neighbours3.get(retryIndex);
+                    Message retryMsg = new Message(9);
+                    retryMsg.operationId = fop.getId();
+                    retryMsg.src = this.getNode();
+                    retryMsg.dst = this.nodeIdtoNode(nextNodeId).getKademliaProtocol().getNode();
+                    retryMsg.body = getOp.getBody();
+                    retryMsg.value = getOp.getValue();
+                    this.sendMessage(retryMsg, nextNodeId, myPid);
+                    this.chunkRetryIndex.put(chunkKey, retryIndex + 1);
+                } else {
+                    fop.setFinished(true);
+                }
+                return;
+            }
+            if (fop instanceof GetOperation && m.value instanceof List && !((GetOperation)fop).isMetadataHandled()) {
+                ((GetOperation)fop).setMetadataHandled(true);
+                fop.setFinished(true);
+                ((GetOperation)fop).setValue(m.value);
+                List chunkKeys = (List)m.value;
+                Collections.shuffle(chunkKeys);
+                this.targetChunks = chunkKeys.subList(0, 1023);
+                this.requiredChunkCount = this.targetChunks.size();
+                System.out.println("[GET] \ud83c\udfaf Required chunks to retrieve: " + this.requiredChunkCount);
+                for (BigInteger chunkKey : this.targetChunks) {
+                    GetOperation chunkFop = new GetOperation(this.node.getId(), chunkKey, m.timestamp);
+                    chunkFop.setBody(chunkKey);
+                    this.findOp.put(chunkFop.getId(), chunkFop);
+                    neighbours2 = this.routingTable.getNeighbours(chunkKey, this.getNode().getId());
+                    chunkFop.elaborateResponse(neighbours2);
+                    chunkFop.setAvailableRequests(KademliaCommonConfig.ALPHA);
+                    Message findMsg = new Message(5);
+                    findMsg.operationId = chunkFop.getId();
+                    findMsg.src = this.getNode();
+                    findMsg.body = chunkKey;
+                    chunkFop.nrHops++;
+                    this.findStartTimeMap.put(findMsg.operationId, CommonState.getTime());
+                    int i = 0;
+                    while (i < KademliaCommonConfig.ALPHA) {
+                        BigInteger nextNode = chunkFop.getNeighbour();
+                        if (nextNode != null) {
+                            findMsg.dst = this.nodeIdtoNode(nextNode).getKademliaProtocol().getNode();
+                            this.sendMessage(findMsg.copy(), nextNode, myPid);
+                        }
+                        ++i;
+                    }
+                }
+            }
+            while (fop.getAvailableRequests() > 0) {
+                neighbour = fop.getNeighbour();
+                if (neighbour != null) {
+                    if (fop.isFinished()) continue;
+                    Message request = fop.getClass() == GetOperation.class ? new Message(5) : (KademliaCommonConfig.FINDMODE == 0 ? new Message(5) : new Message(6));
+                    request.operationId = m.operationId;
+                    request.src = this.getNode();
+                    request.dst = this.nodeIdtoNode(neighbour).getKademliaProtocol().getNode();
+                    this.findStartTimeMap.put(request.operationId, CommonState.getTime());
+                    request.body = KademliaCommonConfig.FINDMODE == 0 || request.getType() == 9 ? fop.getDestNode() : Integer.valueOf(Util.logDistance(fop.getDestNode(), (BigInteger)fop.getBody()));
+                    fop.nrHops++;
+                    this.sendMessage(request, neighbour, myPid);
+                    continue;
+                }
+                if (fop.getAvailableRequests() == KademliaCommonConfig.ALPHA) {
+                    Long start = this.findStartTimeMap.get(fop.getId());
+                    if (start != null) {
+                        long duration = CommonState.getTime() - start;
+                        KademliaObserver.findTimeStore.add(duration);
+                    }
+                    if (fop instanceof PutOperation) {
+                        PutOperation putOp = (PutOperation)fop;
+                        for (BigInteger id : fop.getNeighboursList()) {
+                            Message putMsg = new Message(8);
+                            putMsg.operationId = m.operationId;
+                            putMsg.src = this.getNode();
+                            putMsg.dst = this.nodeIdtoNode(id).getKademliaProtocol().getNode();
+                            putMsg.body = putOp.getBody();
+                            putMsg.value = putOp.getValue();
+                            this.sendMessage(putMsg, id, myPid);
+                        }
+                        this.findOp.remove(fop.getId());
+                    } else if (fop instanceof GetOperation) {
+                        GetOperation getOp2 = (GetOperation)fop;
+                        BigInteger chunkKey = (BigInteger)getOp2.getBody();
+                        // recovery: CFR slip fixed by hand (bytecode re-checked against Damir's build)
+                        List<BigInteger> neighboursList = fop.getNeighboursList();
+                        if (this.retrievedChunks.containsKey(chunkKey)) {
+                            this.findOp.remove(fop.getId());
+                            return;
+                        }
+                        int index = this.chunkRetryIndex.getOrDefault(chunkKey, 0);
+                        if (index >= neighboursList.size()) {
+                            this.findOp.remove(fop.getId());
+                            return;
+                        }
+                        BigInteger targetNode = neighboursList.get(index);
+                        Message getMsg = new Message(9);
+                        getMsg.operationId = m.operationId;
+                        getMsg.src = this.getNode();
+                        getMsg.dst = this.nodeIdtoNode(targetNode).getKademliaProtocol().getNode();
+                        getMsg.body = chunkKey;
+                        this.sendMessage(getMsg, targetNode, myPid);
+                        this.chunkRetryIndex.put(chunkKey, index + 1);
+                    } else {
+                        this.findOp.remove(fop.getId());
+                    }
+                    if (fop.getBody().equals("Automatically Generated Traffic") && fop.getClosest().containsKey(fop.getDestNode())) {
+                        long timeInterval = CommonState.getTime() - fop.getTimestamp();
+                        KademliaObserver.timeStore.add(timeInterval);
+                        KademliaObserver.hopStore.add(fop.nrHops);
+                        KademliaObserver.msg_deliv.add(1.0);
+                    }
+                    return;
+                }
+                return;
+            }
+        } else {
+            return;
+        }
     }
-  }
 
-  /** get the current Node */
-  public KademliaNode getNode() {
-    return this.node;
-  }
+    private void handlePut(Message m, int myPid) {
+        Message ack = new Message(19);
+        ack.operationId = m.operationId;
+        ack.src = this.getNode();
+        ack.dst = m.src;
+        this.sendMessage(ack, m.src.getId(), myPid);
+        this.kv.add((BigInteger)m.body, m.value);
+    }
 
-  /** get the kademlia node routing table */
-  public RoutingTable getRoutingTable() {
-    return this.routingTable;
-  }
+    private void handleFind(Message m, int myPid) {
+        this.logger.info("handleFind received from " + String.valueOf(m.src.getId()) + " " + m.operationId);
+        if (m.getType() != 9) {
+            KademliaObserver.find_op.add(1.0);
+        }
+        BigInteger[] neighbours = new BigInteger[KademliaCommonConfig.K];
+        if (m.getType() == 5 || m.getType() == 9) {
+            neighbours = this.routingTable.getNeighbours((BigInteger)m.body, m.src.getId());
+        } else if (m.getType() == 6) {
+            neighbours = this.routingTable.getNeighbours((Integer)m.body);
+        } else {
+            return;
+        }
+        Message response = new Message(7, neighbours);
+        response.operationId = m.operationId;
+        response.dst = m.dst;
+        response.src = this.getNode();
+        response.ackId = m.id;
+        this.sendMessage(response, m.src.getId(), myPid);
+        if (m.getType() == 9) {
+            Message response1 = new Message(18, neighbours);
+            response1.operationId = m.operationId;
+            response1.dst = m.dst;
+            response1.src = this.getNode();
+            response1.ackId = m.id;
+            response1.value = this.kv.get((BigInteger)m.body);
+            this.sendMessage(response1, m.src.getId(), myPid);
+        }
+    }
 
-  /** Set the protocol ID for this node. */
-  public void setProtocolID(int protocolID) {
-    this.kademliaid = protocolID;
-  }
+    private void handleInit(Node myNode, Message m, int myPid) {
+        FindOperation fop;
+        this.logger.info("handleInitFind " + String.valueOf((BigInteger)m.body));
+        KademliaObserver.find_op.add(1.0);
+        switch (m.type) {
+            case 2: {
+                fop = new FindOperation(this.node.getId(), (BigInteger)m.body, m.timestamp);
+                break;
+            }
+            case 3: {
+                KademliaObserver.reset();
+                System.out.println("\ud83d\udce5 MSG_INIT_GET received");
+                this.chunkStartTime = CommonState.getTime();
+                BigInteger fileKey = (BigInteger)m.body;
+                GetOperation fop2 = new GetOperation(this.node.getId(), fileKey, m.timestamp);
+                fop2.setBody(fileKey);
+                this.findOp.put(fop2.getId(), fop2);
+                BigInteger[] neighbors = this.routingTable.getNeighbours(fileKey, this.node.getId());
+                fop2.elaborateResponse(neighbors);
+                fop2.setAvailableRequests(KademliaCommonConfig.ALPHA);
+                int i = 0;
+                while (i < KademliaCommonConfig.ALPHA) {
+                    BigInteger nextNode = fop2.getNeighbour();
+                    if (nextNode != null) {
+                        Message findMsg = new Message(5);
+                        findMsg.operationId = fop2.getId();
+                        findMsg.src = this.getNode();
+                        findMsg.dst = this.nodeIdtoNode(nextNode).getKademliaProtocol().getNode();
+                        findMsg.body = fileKey;
+                        this.findStartTimeMap.put(findMsg.operationId, CommonState.getTime());
+                        fop2.nrHops++;
+                        this.sendMessage(findMsg.copy(), nextNode, myPid);
+                    }
+                    ++i;
+                }
+                return;
+            }
+            case 4: {
+                BigInteger fileKey1;
+                byte[] fileData;
+                System.out.println("\ud83d\udce5 MSG_INIT_PUT received");
+                if (m.value instanceof String) {
+                    fileData = ((String)m.value).getBytes(StandardCharsets.UTF_8);
+                } else if (m.value instanceof byte[]) {
+                    fileData = (byte[])m.value;
+                } else {
+                    throw new IllegalArgumentException("Unsupported data type for m.value");
+                }
+                this.putOperationStartTime = CommonState.getTime();
+                Map<BigInteger, byte[]> chunkMap = this.chunkFileData(fileData, this.chunkSize);
+                ArrayList<BigInteger> chunkKeys = new ArrayList<BigInteger>(chunkMap.keySet());
+                ArrayList<BigInteger> fileMeta = new ArrayList<BigInteger>(chunkKeys);
+                this.currentPutFileKey = fileKey1 = (BigInteger)m.body;
+                this.receivedAcks = 0;
+                System.out.println("\ud83d\udce6 Storing chunkKey list at fileKey: " + fileKey1.toString(16));
+                PutOperation fileMetaOp = new PutOperation(this.node.getId(), fileKey1, m.timestamp);
+                fileMetaOp.setValue(fileMeta);
+                fileMetaOp.setBody(fileKey1);
+                this.findOp.put(fileMetaOp.getId(), fileMetaOp);
+                BigInteger[] fileMetaPeers = this.routingTable.getNeighbours(fileKey1, this.node.getId());
+                fileMetaOp.elaborateResponse(fileMetaPeers);
+                fileMetaOp.setAvailableRequests(KademliaCommonConfig.ALPHA);
+                int i = 0;
+                while (i < KademliaCommonConfig.ALPHA) {
+                    BigInteger nextNode = fileMetaOp.getNeighbour();
+                    if (nextNode != null) {
+                        Message findMsg = new Message(5);
+                        findMsg.src = this.getNode();
+                        findMsg.dst = this.nodeIdtoNode(nextNode).getKademliaProtocol().getNode();
+                        findMsg.body = fileKey1;
+                        findMsg.operationId = fileMetaOp.getId();
+                        this.findStartTimeMap.put(findMsg.operationId, CommonState.getTime());
+                        fileMetaOp.nrHops++;
+                        this.sendMessage(findMsg.copy(), nextNode, myPid);
+                    }
+                    ++i;
+                }
+                for (Map.Entry<BigInteger, byte[]> entry : chunkMap.entrySet()) {
+                    BigInteger chunkKey = entry.getKey();
+                    byte[] chunkValue = entry.getValue();
+                    PutOperation chunkOp = new PutOperation(this.node.getId(), chunkKey, m.timestamp);
+                    chunkOp.setValue(chunkValue);
+                    chunkOp.setBody(chunkKey);
+                    this.findOp.put(chunkOp.getId(), chunkOp);
+                    BigInteger[] chunkPeers = this.routingTable.getNeighbours(chunkKey, this.node.getId());
+                    chunkOp.elaborateResponse(chunkPeers);
+                    chunkOp.setAvailableRequests(KademliaCommonConfig.ALPHA);
+                    int i2 = 0;
+                    while (i2 < KademliaCommonConfig.ALPHA) {
+                        BigInteger nextNode = chunkOp.getNeighbour();
+                        if (nextNode != null) {
+                            Message chunkFindMsg = new Message(5);
+                            chunkFindMsg.src = this.getNode();
+                            chunkFindMsg.dst = this.nodeIdtoNode(nextNode).getKademliaProtocol().getNode();
+                            chunkFindMsg.body = chunkKey;
+                            chunkFindMsg.operationId = chunkOp.getId();
+                            this.findStartTimeMap.put(chunkFindMsg.operationId, CommonState.getTime());
+                            chunkOp.nrHops++;
+                            this.sendMessage(chunkFindMsg.copy(), nextNode, myPid);
+                        }
+                        ++i2;
+                    }
+                }
+                return;
+            }
+            default: {
+                fop = new FindOperation(this.node.getId(), (BigInteger)m.body, m.timestamp);
+            }
+        }
+        fop.setBody(m.body);
+        this.findOp.put(fop.getId(), fop);
+        BigInteger[] neighbours_default = this.routingTable.getNeighbours((BigInteger)m.body, this.getNode().getId());
+        fop.elaborateResponse(neighbours_default);
+        fop.setAvailableRequests(KademliaCommonConfig.ALPHA);
+        m.operationId = fop.getId();
+        m.src = this.getNode();
+        int i = 0;
+        while (i < KademliaCommonConfig.ALPHA) {
+            BigInteger nextNode = fop.getNeighbour();
+            if (nextNode != null) {
+                m.dst = this.nodeIdtoNode(nextNode).getKademliaProtocol().getNode();
+                if (m.type == 3) {
+                    m.type = 9;
+                } else if (KademliaCommonConfig.FINDMODE == 0) {
+                    m.type = 5;
+                } else {
+                    m.type = 6;
+                    m.body = Util.logDistance(nextNode, (BigInteger)fop.getBody());
+                }
+                this.logger.info("sendMessage to " + String.valueOf(nextNode));
+                this.sendMessage(m.copy(), nextNode, myPid);
+                fop.nrHops++;
+            }
+            ++i;
+        }
+    }
 
-  /**
-   * set the current NodeId
-   *
-   * @param tmp BigInteger
-   */
-  public void setNode(KademliaNode node) {
-    this.node = node;
-    this.routingTable.setNodeId(node.getId());
+    private Map<BigInteger, byte[]> chunkFileData(byte[] fileData, int chunkSize) {
+        LinkedHashMap<BigInteger, byte[]> chunkMap = new LinkedHashMap<BigInteger, byte[]>();
+        this.totalExpectedAcks = (fileData.length / chunkSize + 1) * KademliaCommonConfig.K;
+        int i = 0;
+        while (i < fileData.length) {
+            int end = Math.min(fileData.length, i + chunkSize);
+            byte[] chunk = Arrays.copyOfRange(fileData, i, end);
+            byte[] combined = ByteBuffer.allocate(4).putInt(i).array();
+            byte[] uniqueHashInput = this.concat(combined, chunk);
+            BigInteger chunkKey = new BigInteger(1, Util.SHA256(uniqueHashInput));
+            chunkMap.put(chunkKey, chunk);
+            i += chunkSize;
+        }
+        return chunkMap;
+    }
 
-    logger = Logger.getLogger(node.getId().toString());
-    logger.setUseParentHandlers(false);
-    ConsoleHandler handler = new ConsoleHandler();
-    logger.setLevel(Level.WARNING);
-    // logger.setLevel(Level.ALL);
+    private byte[] concat(byte[] a, byte[] b) {
+        byte[] result = new byte[a.length + b.length];
+        System.arraycopy(a, 0, result, 0, a.length);
+        System.arraycopy(b, 0, result, a.length, b.length);
+        return result;
+    }
 
-    handler.setFormatter(
-        new SimpleFormatter() {
-          private static final String format = "[%d][%s] %3$s %n";
+    public void sendMessage(Message m, BigInteger destId, int myPid) {
+        if (m.getType() != 19) {
+            KademliaObserver.msg_deliv.add(1.0);
+            this.routingTable.addNeighbour(destId);
+        }
+        assert (m.src != null);
+        assert (m.dst != null);
+        Node src = this.nodeIdtoNode(this.getNode().getId());
+        Node dest = this.nodeIdtoNode(destId);
+        this.transport = (UnreliableTransport)Network.prototype.getProtocol(this.tid);
+        this.transport.send(src, dest, m, this.kademliaid);
+        long latency = this.transport.getLatency(src, dest);
+        Timeout t = null;
+        if (m.getType() == 5 || m.getType() == 6 || m.getType() == 9) {
+            t = new Timeout(destId, m.id, m.operationId, false);
+            EDSimulator.add(8L * latency, t, src, myPid);
+        }
+        if (m.getType() == 0) {
+            t = new Timeout(destId, m.id, m.operationId, true);
+            EDSimulator.add(8L * latency, t, src, myPid);
+        }
+        if (t != null) {
+            this.sentMsg.put(m.id, m.timestamp);
+        }
+    }
 
-          @Override
-          public synchronized String format(LogRecord lr) {
-            return String.format(format, CommonState.getTime(), logger.getName(), lr.getMessage());
-          }
+    @Override
+    public void processEvent(Node myNode, int myPid, Object event) {
+        Message m;
+        this.kademliaid = myPid;
+        if (event instanceof Message) {
+            m = (Message)event;
+            KademliaObserver.reportMsg(m, false);
+        }
+        switch (((SimpleEvent)event).getType()) {
+            case 7: {
+                m = (Message)event;
+                this.sentMsg.remove(m.ackId);
+                this.handleResponse(m, myPid);
+                break;
+            }
+            case 19: {
+                m = (Message)event;
+                if (this.currentPutFileKey == null) break;
+                ++this.receivedAcks;
+                if ((double)this.receivedAcks != this.totalExpectedAcks) break;
+                long fullTime = CommonState.getTime() - this.putOperationStartTime;
+                KademliaObserver.putTimeStore.add(fullTime);
+                System.out.println("[PUT] \u2705 Full operation took " + fullTime + " time units for fileKey at " + String.valueOf(this.currentPutFileKey));
+                this.currentPutFileKey = null;
+                break;
+            }
+            case 18: {
+                m = (Message)event;
+                this.handleResponse(m, myPid);
+                break;
+            }
+            case 2: 
+            case 3: 
+            case 4: {
+                m = (Message)event;
+                this.handleInit(myNode, m, myPid);
+                break;
+            }
+            case 5: 
+            case 6: 
+            case 9: {
+                m = (Message)event;
+                this.handleFind(m, myPid);
+                break;
+            }
+            case 8: {
+                m = (Message)event;
+                this.handlePut(m, myPid);
+                break;
+            }
+            case 0: {
+                m = (Message)event;
+                if (m.src == null) break;
+                Message pong = new Message(21);
+                pong.operationId = m.operationId;
+                pong.id = CommonState.r.nextLong();
+                pong.ackId = m.id;
+                pong.src = this.getNode();
+                pong.dst = m.src;
+                this.sendMessage(pong, m.src.getId(), myPid);
+                break;
+            }
+            case 1: {
+                break;
+            }
+            case 21: {
+                m = (Message)event;
+                if (!this.sentMsg.containsKey(m.ackId)) break;
+                this.sentMsg.remove(m.ackId);
+                break;
+            }
+            case 100: {
+                boolean isChunkGetOperation;
+                FindOperation fop;
+                Timeout t = (Timeout)event;
+                if (!this.sentMsg.containsKey(t.msgID)) break;
+                this.sentMsg.remove(t.msgID);
+                BigInteger timedOutNodeId = t.node;
+                long operationId = t.opID;
+                if (t.isEmptyPing) {
+                    this.routingTable.removeNeighbour(timedOutNodeId);
+                    break;
+                }
+                Message empty = new Message(0);
+                empty.operationId = operationId;
+                empty.id = CommonState.r.nextLong();
+                empty.src = this.getNode();
+                Node destNode = this.nodeIdtoNode(timedOutNodeId);
+                if (destNode != null) {
+                    empty.dst = destNode.getKademliaProtocol().getNode();
+                    this.sendMessage(empty, timedOutNodeId, myPid);
+                }
+                if ((fop = this.findOp.get(operationId)) == null || fop.isFinished()) break;
+                boolean bl = isChunkGetOperation = fop instanceof GetOperation && fop.getBody() instanceof BigInteger;
+                if (isChunkGetOperation) {
+                    GetOperation getOp = (GetOperation)fop;
+                    BigInteger chunkKey = (BigInteger)getOp.getBody();
+                    List<BigInteger> neighbours3 = getOp.getNeighboursList();
+                    int retryIndex = this.chunkRetryIndex.getOrDefault(chunkKey, 0);
+                    if (retryIndex < neighbours3.size()) {
+                        BigInteger nextNodeId = neighbours3.get(retryIndex);
+                        Message retryMsg = new Message(9);
+                        retryMsg.operationId = operationId;
+                        retryMsg.src = this.getNode();
+                        Node destNodeObj = this.nodeIdtoNode(nextNodeId);
+                        if (destNodeObj == null) break;
+                        retryMsg.dst = destNodeObj.getKademliaProtocol().getNode();
+                        retryMsg.body = chunkKey;
+                        this.sendMessage(retryMsg, nextNodeId, myPid);
+                        this.chunkRetryIndex.put(chunkKey, retryIndex + 1);
+                        break;
+                    }
+                    if (!this.findOp.containsKey(operationId)) break;
+                    this.findOp.get(operationId).setFinished(true);
+                    break;
+                }
+                fop.getClosest().remove(timedOutNodeId);
+                fop.setAvailableRequests(fop.getAvailableRequests() + 1);
+                ArrayList<Long> otherOpIds = new ArrayList<Long>(this.findOp.keySet());
+                Iterator iterator = otherOpIds.iterator();
+                while (iterator.hasNext()) {
+                    FindOperation otherFop;
+                    long otherId = (Long)iterator.next();
+                    if (otherId == operationId || (otherFop = this.findOp.get(otherId)) == null || otherFop.isFinished()) continue;
+                    otherFop.getClosest().remove(timedOutNodeId);
+                }
+                break;
+            }
+        }
+    }
+
+    public KademliaNode getNode() {
+        return this.node;
+    }
+
+    public RoutingTable getRoutingTable() {
+        return this.routingTable;
+    }
+
+    public void setProtocolID(int protocolID) {
+        this.kademliaid = protocolID;
+    }
+
+    public void setNode(KademliaNode node) {
+        this.node = node;
+        this.routingTable.setNodeId(node.getId());
+        this.logger = Logger.getLogger(node.getId().toString());
+        this.logger.setUseParentHandlers(false);
+        ConsoleHandler handler = new ConsoleHandler();
+        this.logger.setLevel(Level.WARNING);
+        handler.setFormatter(new SimpleFormatter(){
+            private static final String format = "[%d][%s] %3$s %n";
+
+            @Override
+            public synchronized String format(LogRecord lr) {
+                return String.format(format, CommonState.getTime(), KademliaProtocol.this.logger.getName(), lr.getMessage());
+            }
         });
-    logger.addHandler(handler);
-  }
+        this.logger.addHandler(handler);
+    }
 }
+

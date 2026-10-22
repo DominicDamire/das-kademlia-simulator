@@ -1,30 +1,37 @@
+/*
+ * Decompiled with CFR 0.152.
+ */
 package peersim.kademlia.operations;
 
 import java.math.BigInteger;
+import peersim.kademlia.operations.FindOperation;
 
-public class GetOperation extends FindOperation {
+public class GetOperation
+extends FindOperation {
+    private Object value = null;
+    private boolean metadataHandled = false;
 
-  Object value;
-  /**
-   * defaul constructor
-   *
-   * @param destNode Id of the node to find
-   */
-  public GetOperation(BigInteger srcNode, BigInteger destNode, long timestamp) {
-    super(srcNode, destNode, timestamp);
-  }
+    public GetOperation(BigInteger srcNode, BigInteger destNode, long timestamp) {
+        super(srcNode, destNode, timestamp);
+        // recovery: restored to match original bytecode
+        this.value = null;
+        this.metadataHandled = false;
+    }
 
-  /**
-   * Save found value in get operation
-   *
-   * @param value
-   */
-  public void setValue(Object value) {
-    this.value = value;
-  }
+    public void setValue(Object value) {
+        this.value = value;
+    }
 
-  /** Get found value in get operation */
-  public Object getValue() {
-    return value;
-  }
+    public Object getValue() {
+        return this.value;
+    }
+
+    public boolean isMetadataHandled() {
+        return this.metadataHandled;
+    }
+
+    public void setMetadataHandled(boolean metadataHandled) {
+        this.metadataHandled = metadataHandled;
+    }
 }
+

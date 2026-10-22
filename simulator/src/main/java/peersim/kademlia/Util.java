@@ -1,76 +1,43 @@
+/*
+ * Decompiled with CFR 0.152.
+ */
 package peersim.kademlia;
 
 import java.math.BigInteger;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import peersim.kademlia.KademliaCommonConfig;
 
-/**
- * Some utility and mathematical function to work with BigInteger numbers and strings.
- *
- * @author Daniele Furlan, Maurizio Bonani
- * @version 1.0
- */
 public class Util {
-
-  /**
-   * Given two numbers, returns the length of the common prefix, i.e. how many digits (in base 2)
-   * have in common from the leftmost side of the number
-   *
-   * @param b1 BigInteger
-   * @param b2 BigInteger
-   * @return int
-   *     <p>public static final int prefixLen(BigInteger b1, BigInteger b2) {
-   *     <p>String s1 = Util.put0(b1); String s2 = Util.put0(b2);
-   *     <p>int i = 0; for (i = 0; i < s1.length(); i++) { if (s1.charAt(i) != s2.charAt(i)) return
-   *     i; }
-   *     <p>return i; }
-   */
-
-  /**
-   * return the distance between two number which is defined as (a XOR b)
-   *
-   * @param a BigInteger
-   * @param b BigInteger
-   * @return BigInteger
-   *     <p>public static BigInteger xorDistance(BigInteger a, BigInteger b) { return a.xor(b); }
-   */
-
-  /**
-   * convert a BigInteger into a String (base 2) and lead all needed non-significative zeroes in
-   * order to reach the canonical length of a nodeid
-   *
-   * @param b BigInteger
-   * @return String
-   */
-  public static final String put0(BigInteger b) {
-    if (b == null) return null;
-    String s = b.toString(2); // base 2
-    while (s.length() < KademliaCommonConfig.BITS) {
-      s = "0" + s;
+    public static final String put0(BigInteger b) {
+        if (b == null) {
+            return null;
+        }
+        // recovery: CFR slip fixed by hand (bytecode re-checked against Damir's build)
+        String s = b.toString(2);
+        while (s.length() < KademliaCommonConfig.BITS) {
+            s = "0" + s;
+        }
+        return s;
     }
-    return s;
-  }
-  /**
-   * Measures the log-distance between two BigInteger values using the length of the differing
-   * suffix in bits
-   *
-   * @param BigInteger a
-   * @param BigInteger b
-   * @return int result
-   */
-  public static int logDistance(BigInteger a, BigInteger b) {
 
-    BigInteger x = a.xor(b);
+    public static int logDistance(BigInteger a, BigInteger b) {
+        BigInteger x = a.xor(b);
+        return x.bitLength();
+    }
 
-    return x.bitLength();
-  }
+    public static BigInteger xorDistance(BigInteger a, BigInteger b) {
+        return a.xor(b);
+    }
 
-  /**
-   * return the distance between two number wich is defined as (a XOR b)
-   *
-   * @param a BigInteger
-   * @param b BigInteger
-   * @return BigInteger
-   */
-  public static BigInteger xorDistance(BigInteger a, BigInteger b) {
-    return a.xor(b);
-  }
+    public static byte[] SHA256(byte[] input) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return digest.digest(input);
+        }
+        catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
+    }
 }
+
