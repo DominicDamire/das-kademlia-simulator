@@ -1,0 +1,120 @@
+Simulator: loading configuration[config/kademlia_putget_small.cfg]
+ConfigProperties: File config/kademlia_putget_small.cfg loaded.
+Simulator: starting experiment 0 invoking peersim.edsim.EDSimulator
+Random seed: 24680
+
+
+
+EDSimulator: resetting
+Network: no node defined, using GeneralNode
+EDSimulator: running initializers
+- Running initializer init.1uniqueNodeID: class peersim.kademlia.CustomDistribution
+- Running initializer init.2statebuilder: class peersim.kademlia.StateBuilder
+Turbulence: [p_idle=0.330000] [p_add=0.330000] [(min,max)=(2147483647,1)]
+EDSimulator: loaded controls [control.0traffic, control.2turbolenceAdd, control.3]
+Current time: 0
+[time=0]:[N=500 current nodes UP] [D=0.000000 msg deliv] [ HOP AVG h=NaN] [ GET AVG l=0 msec] [ PUT AVG l=0 msec] [ FIND MIN l=2147483647 msec] [ FIND MAX l=-2147483648 msec] [ FIND AVG l=0 msec] [find op sent=0] 
+📥 MSG_INIT_PUT received
+📦 Storing chunkKey list at fileKey: 628b49d9 (SHA-256 of "t1", shortened)
+[PUT] ✅ Full operation took 300 time units for fileKey at 44572760592519791049693493502789098925949292785665845984629667213135946243074
+[time=100000]:[N=500 current nodes UP] [D=2771230.000000 msg deliv] [ HOP AVG h=NaN] [ GET AVG l=0 msec] [ PUT AVG l=300 msec] [ FIND MIN l=20 msec] [ FIND MAX l=20 msec] [ FIND AVG l=20 msec] [find op sent=924798] 
+[time=200000]:[N=499 current nodes UP] [D=2771230.000000 msg deliv] [ HOP AVG h=NaN] [ GET AVG l=0 msec] [ PUT AVG l=300 msec] [ FIND MIN l=20 msec] [ FIND MAX l=20 msec] [ FIND AVG l=20 msec] [find op sent=924798] 
+Adding node 500
+Generating Get message for key t1
+[time=300000]:[N=500 current nodes UP] [D=2771304.000000 msg deliv] [ HOP AVG h=NaN] [ GET AVG l=0 msec] [ PUT AVG l=300 msec] [ FIND MIN l=20 msec] [ FIND MAX l=20 msec] [ FIND AVG l=20 msec] [find op sent=924836] 
+📥 MSG_INIT_GET received
+[GET] 🎯 Required chunks to retrieve: 1023
+[GET] 🎉 Sufficient chunks retrieved! Stopping.
+GET operation took 400 time units.
+[time=400000]:[N=500 current nodes UP] [D=74906.000000 msg deliv] [ HOP AVG h=35.000000] [ GET AVG l=400 msec] [ PUT AVG l=0 msec] [ FIND MIN l=20 msec] [ FIND MAX l=20 msec] [ FIND AVG l=20 msec] [find op sent=35846] 
+Adding node 501
+[time=500000]:[N=501 current nodes UP] [D=74906.000000 msg deliv] [ HOP AVG h=35.000000] [ GET AVG l=400 msec] [ PUT AVG l=0 msec] [ FIND MIN l=20 msec] [ FIND MAX l=20 msec] [ FIND AVG l=20 msec] [find op sent=35847] 
+Adding node 502
+Generating Get message for key t1
+[time=600000]:[N=502 current nodes UP] [D=74906.000000 msg deliv] [ HOP AVG h=35.000000] [ GET AVG l=400 msec] [ PUT AVG l=0 msec] [ FIND MIN l=20 msec] [ FIND MAX l=20 msec] [ FIND AVG l=20 msec] [find op sent=35848] 
+📥 MSG_INIT_GET received
+[GET] 🎯 Required chunks to retrieve: 1023
+[GET] 🎉 Sufficient chunks retrieved! Stopping.
+GET operation took 400 time units.
+[time=700000]:[N=502 current nodes UP] [D=75240.000000 msg deliv] [ HOP AVG h=36.000000] [ GET AVG l=400 msec] [ PUT AVG l=0 msec] [ FIND MIN l=20 msec] [ FIND MAX l=20 msec] [ FIND AVG l=20 msec] [find op sent=36006] 
+[time=800000]:[N=502 current nodes UP] [D=75240.000000 msg deliv] [ HOP AVG h=36.000000] [ GET AVG l=400 msec] [ PUT AVG l=0 msec] [ FIND MIN l=20 msec] [ FIND MAX l=20 msec] [ FIND AVG l=20 msec] [find op sent=36006] 
+Generating Get message for key t1
+[time=900000]:[N=501 current nodes UP] [D=75240.000000 msg deliv] [ HOP AVG h=36.000000] [ GET AVG l=400 msec] [ PUT AVG l=0 msec] [ FIND MIN l=20 msec] [ FIND MAX l=20 msec] [ FIND AVG l=20 msec] [find op sent=36006] 
+📥 MSG_INIT_GET received
+[GET] 🎯 Required chunks to retrieve: 1023
+[GET] 🎉 Sufficient chunks retrieved! Stopping.
+GET operation took 460 time units.
+[time=1000000]:[N=501 current nodes UP] [D=75072.000000 msg deliv] [ HOP AVG h=35.000000] [ GET AVG l=460 msec] [ PUT AVG l=0 msec] [ FIND MIN l=0 msec] [ FIND MAX l=100 msec] [ FIND AVG l=20 msec] [find op sent=35864] 
+Adding node 502
+[time=1100000]:[N=502 current nodes UP] [D=75072.000000 msg deliv] [ HOP AVG h=35.000000] [ GET AVG l=460 msec] [ PUT AVG l=0 msec] [ FIND MIN l=0 msec] [ FIND MAX l=100 msec] [ FIND AVG l=20 msec] [find op sent=35865] 
+Adding node 503
+Generating Get message for key t1
+[time=1200000]:[N=503 current nodes UP] [D=75146.000000 msg deliv] [ HOP AVG h=35.000000] [ GET AVG l=460 msec] [ PUT AVG l=0 msec] [ FIND MIN l=0 msec] [ FIND MAX l=100 msec] [ FIND AVG l=20 msec] [find op sent=35903] 
+📥 MSG_INIT_GET received
+[GET] 🎯 Required chunks to retrieve: 1023
+[GET] 🎉 Sufficient chunks retrieved! Stopping.
+GET operation took 440 time units.
+[time=1300000]:[N=503 current nodes UP] [D=74474.000000 msg deliv] [ HOP AVG h=34.000000] [ GET AVG l=440 msec] [ PUT AVG l=0 msec] [ FIND MIN l=0 msec] [ FIND MAX l=100 msec] [ FIND AVG l=21 msec] [find op sent=35529] 
+[time=1400000]:[N=503 current nodes UP] [D=74474.000000 msg deliv] [ HOP AVG h=34.000000] [ GET AVG l=440 msec] [ PUT AVG l=0 msec] [ FIND MIN l=0 msec] [ FIND MAX l=100 msec] [ FIND AVG l=21 msec] [find op sent=35529] 
+Generating Get message for key t1
+[time=1500000]:[N=502 current nodes UP] [D=74474.000000 msg deliv] [ HOP AVG h=34.000000] [ GET AVG l=440 msec] [ PUT AVG l=0 msec] [ FIND MIN l=0 msec] [ FIND MAX l=100 msec] [ FIND AVG l=21 msec] [find op sent=35529] 
+📥 MSG_INIT_GET received
+[GET] 🎯 Required chunks to retrieve: 1023
+[GET] 🎉 Sufficient chunks retrieved! Stopping.
+GET operation took 480 time units.
+[time=1600000]:[N=501 current nodes UP] [D=71946.000000 msg deliv] [ HOP AVG h=38.000000] [ GET AVG l=480 msec] [ PUT AVG l=0 msec] [ FIND MIN l=0 msec] [ FIND MAX l=100 msec] [ FIND AVG l=22 msec] [find op sent=34159] 
+[time=1700000]:[N=501 current nodes UP] [D=71946.000000 msg deliv] [ HOP AVG h=38.000000] [ GET AVG l=480 msec] [ PUT AVG l=0 msec] [ FIND MIN l=0 msec] [ FIND MAX l=100 msec] [ FIND AVG l=22 msec] [find op sent=34159] 
+Adding node 502
+Generating Get message for key t1
+[time=1800000]:[N=502 current nodes UP] [D=72020.000000 msg deliv] [ HOP AVG h=38.000000] [ GET AVG l=480 msec] [ PUT AVG l=0 msec] [ FIND MIN l=0 msec] [ FIND MAX l=100 msec] [ FIND AVG l=22 msec] [find op sent=34197] 
+📥 MSG_INIT_GET received
+[GET] 🎯 Required chunks to retrieve: 1023
+[GET] 🎉 Sufficient chunks retrieved! Stopping.
+GET operation took 460 time units.
+[time=1900000]:[N=502 current nodes UP] [D=72378.000000 msg deliv] [ HOP AVG h=37.000000] [ GET AVG l=460 msec] [ PUT AVG l=0 msec] [ FIND MIN l=0 msec] [ FIND MAX l=100 msec] [ FIND AVG l=23 msec] [find op sent=34263] 
+[time=2000000]:[N=502 current nodes UP] [D=72378.000000 msg deliv] [ HOP AVG h=37.000000] [ GET AVG l=460 msec] [ PUT AVG l=0 msec] [ FIND MIN l=0 msec] [ FIND MAX l=100 msec] [ FIND AVG l=23 msec] [find op sent=34263] 
+Adding node 503
+Generating Get message for key t1
+[time=2100000]:[N=503 current nodes UP] [D=72378.000000 msg deliv] [ HOP AVG h=37.000000] [ GET AVG l=460 msec] [ PUT AVG l=0 msec] [ FIND MIN l=0 msec] [ FIND MAX l=100 msec] [ FIND AVG l=23 msec] [find op sent=34264] 
+📥 MSG_INIT_GET received
+[GET] 🎯 Required chunks to retrieve: 1023
+[GET] 🎉 Sufficient chunks retrieved! Stopping.
+GET operation took 480 time units.
+Adding node 504
+[time=2200000]:[N=504 current nodes UP] [D=72120.000000 msg deliv] [ HOP AVG h=36.000000] [ GET AVG l=480 msec] [ PUT AVG l=0 msec] [ FIND MIN l=0 msec] [ FIND MAX l=100 msec] [ FIND AVG l=24 msec] [find op sent=34113] 
+[time=2300000]:[N=504 current nodes UP] [D=72120.000000 msg deliv] [ HOP AVG h=36.000000] [ GET AVG l=480 msec] [ PUT AVG l=0 msec] [ FIND MIN l=0 msec] [ FIND MAX l=100 msec] [ FIND AVG l=24 msec] [find op sent=34113] 
+Generating Get message for key t1
+[time=2400000]:[N=504 current nodes UP] [D=72120.000000 msg deliv] [ HOP AVG h=36.000000] [ GET AVG l=480 msec] [ PUT AVG l=0 msec] [ FIND MIN l=0 msec] [ FIND MAX l=100 msec] [ FIND AVG l=24 msec] [find op sent=34113] 
+📥 MSG_INIT_GET received
+[GET] 🎯 Required chunks to retrieve: 1023
+[GET] 🎉 Sufficient chunks retrieved! Stopping.
+GET operation took 460 time units.
+Adding node 505
+[time=2500000]:[N=505 current nodes UP] [D=70092.000000 msg deliv] [ HOP AVG h=36.000000] [ GET AVG l=460 msec] [ PUT AVG l=0 msec] [ FIND MIN l=0 msec] [ FIND MAX l=100 msec] [ FIND AVG l=22 msec] [find op sent=33138] 
+[time=2600000]:[N=504 current nodes UP] [D=70092.000000 msg deliv] [ HOP AVG h=36.000000] [ GET AVG l=460 msec] [ PUT AVG l=0 msec] [ FIND MIN l=0 msec] [ FIND MAX l=100 msec] [ FIND AVG l=22 msec] [find op sent=33138] 
+Generating Get message for key t1
+[time=2700000]:[N=504 current nodes UP] [D=70092.000000 msg deliv] [ HOP AVG h=36.000000] [ GET AVG l=460 msec] [ PUT AVG l=0 msec] [ FIND MIN l=0 msec] [ FIND MAX l=100 msec] [ FIND AVG l=22 msec] [find op sent=33138] 
+📥 MSG_INIT_GET received
+[GET] 🎯 Required chunks to retrieve: 1023
+[GET] 🎉 Sufficient chunks retrieved! Stopping.
+GET operation took 460 time units.
+[time=2800000]:[N=504 current nodes UP] [D=70793.000000 msg deliv] [ HOP AVG h=36.000000] [ GET AVG l=460 msec] [ PUT AVG l=0 msec] [ FIND MIN l=0 msec] [ FIND MAX l=100 msec] [ FIND AVG l=23 msec] [find op sent=33400] 
+[time=2900000]:[N=504 current nodes UP] [D=70793.000000 msg deliv] [ HOP AVG h=36.000000] [ GET AVG l=460 msec] [ PUT AVG l=0 msec] [ FIND MIN l=0 msec] [ FIND MAX l=100 msec] [ FIND AVG l=23 msec] [find op sent=33400] 
+Generating Get message for key t1
+[time=3000000]:[N=504 current nodes UP] [D=70793.000000 msg deliv] [ HOP AVG h=36.000000] [ GET AVG l=460 msec] [ PUT AVG l=0 msec] [ FIND MIN l=0 msec] [ FIND MAX l=100 msec] [ FIND AVG l=23 msec] [find op sent=33400] 
+📥 MSG_INIT_GET received
+[GET] 🎯 Required chunks to retrieve: 1023
+[GET] 🎉 Sufficient chunks retrieved! Stopping.
+GET operation took 460 time units.
+[time=3100000]:[N=504 current nodes UP] [D=71213.000000 msg deliv] [ HOP AVG h=35.000000] [ GET AVG l=460 msec] [ PUT AVG l=0 msec] [ FIND MIN l=0 msec] [ FIND MAX l=100 msec] [ FIND AVG l=22 msec] [find op sent=33629] 
+[time=3200000]:[N=503 current nodes UP] [D=71213.000000 msg deliv] [ HOP AVG h=35.000000] [ GET AVG l=460 msec] [ PUT AVG l=0 msec] [ FIND MIN l=0 msec] [ FIND MAX l=100 msec] [ FIND AVG l=22 msec] [find op sent=33629] 
+Generating Get message for key t1
+[time=3300000]:[N=503 current nodes UP] [D=71213.000000 msg deliv] [ HOP AVG h=35.000000] [ GET AVG l=460 msec] [ PUT AVG l=0 msec] [ FIND MIN l=0 msec] [ FIND MAX l=100 msec] [ FIND AVG l=22 msec] [find op sent=33629] 
+📥 MSG_INIT_GET received
+[GET] 🎯 Required chunks to retrieve: 1023
+[GET] 🎉 Sufficient chunks retrieved! Stopping.
+GET operation took 460 time units.
+[time=3400000]:[N=502 current nodes UP] [D=70240.000000 msg deliv] [ HOP AVG h=36.000000] [ GET AVG l=460 msec] [ PUT AVG l=0 msec] [ FIND MIN l=0 msec] [ FIND MAX l=100 msec] [ FIND AVG l=23 msec] [find op sent=33091] 
+Adding node 503
+[time=3500000]:[N=503 current nodes UP] [D=70318.000000 msg deliv] [ HOP AVG h=36.000000] [ GET AVG l=460 msec] [ PUT AVG l=0 msec] [ FIND MIN l=0 msec] [ FIND MAX l=100 msec] [ FIND AVG l=23 msec] [find op sent=33128] 
+EDSimulator: queue is empty, quitting at time 3500000
