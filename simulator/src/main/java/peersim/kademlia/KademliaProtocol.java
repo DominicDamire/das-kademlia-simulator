@@ -195,8 +195,7 @@ EDProtocol {
                 fop.setFinished(true);
                 ((GetOperation)fop).setValue(m.value);
                 List chunkKeys = (List)m.value;
-                Collections.shuffle(chunkKeys);
-                this.targetChunks = chunkKeys.subList(0, 1023);
+                this.targetChunks = KademliaProtocol.sampleKeys(chunkKeys, 1023);
                 this.requiredChunkCount = this.targetChunks.size();
                 System.out.println("[GET] \ud83c\udfaf Required chunks to retrieve: " + this.requiredChunkCount);
                 for (BigInteger chunkKey : this.targetChunks) {
@@ -472,14 +471,22 @@ EDProtocol {
     }
 
     private Map<BigInteger, byte[]> chunkFileData(byte[] fileData, int chunkSize) {
+        this.totalExpectedAcks = KademliaProtocol.expectedAcks(fileData.length, chunkSize, KademliaCommonConfig.K);
+        return KademliaProtocol.chunk(fileData, chunkSize);
+    }
+
+    static double expectedAcks(int dataLength, int chunkSize, int replicas) {
+        return (dataLength / chunkSize + 1) * replicas;
+    }
+
+    static LinkedHashMap<BigInteger, byte[]> chunk(byte[] fileData, int chunkSize) {
         LinkedHashMap<BigInteger, byte[]> chunkMap = new LinkedHashMap<BigInteger, byte[]>();
-        this.totalExpectedAcks = (fileData.length / chunkSize + 1) * KademliaCommonConfig.K;
         int i = 0;
         while (i < fileData.length) {
             int end = Math.min(fileData.length, i + chunkSize);
             byte[] chunk = Arrays.copyOfRange(fileData, i, end);
             byte[] combined = ByteBuffer.allocate(4).putInt(i).array();
-            byte[] uniqueHashInput = this.concat(combined, chunk);
+            byte[] uniqueHashInput = KademliaProtocol.concat(combined, chunk);
             BigInteger chunkKey = new BigInteger(1, Util.SHA256(uniqueHashInput));
             chunkMap.put(chunkKey, chunk);
             i += chunkSize;
@@ -487,7 +494,12 @@ EDProtocol {
         return chunkMap;
     }
 
-    private byte[] concat(byte[] a, byte[] b) {
+    static List<BigInteger> sampleKeys(List<BigInteger> chunkKeys, int n) {
+        Collections.shuffle(chunkKeys);
+        return chunkKeys.subList(0, n);
+    }
+
+    private static byte[] concat(byte[] a, byte[] b) {
         byte[] result = new byte[a.length + b.length];
         System.arraycopy(a, 0, result, 0, a.length);
         System.arraycopy(b, 0, result, a.length, b.length);

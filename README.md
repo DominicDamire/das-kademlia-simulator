@@ -1,3 +1,5 @@
+[![CI](https://github.com/DominicDamire/das-kademlia-simulator/actions/workflows/ci.yml/badge.svg)](https://github.com/DominicDamire/das-kademlia-simulator/actions/workflows/ci.yml) tests: 8 passing
+
 # Blockchain scalability with data availability sampling over Kademlia
 
 BSc dissertation project, Lancaster University, 2025. It simulates DAS-style chunked storage and random-sampling retrieval over a Kademlia network in [PeerSim](http://peersim.sourceforge.net/).
@@ -99,7 +101,18 @@ mvn -q package -DskipTests -Dfmt.skip=true
 
 ## Tests
 
-There are no automated tests (`src/test/java` is empty). The checks used for this repository are the build, the 500-node run above and the byte-level comparison with the compiled build described in [`docs/RECOVERY.md`](docs/RECOVERY.md).
+```shell
+cd simulator
+mvn -q test -Dfmt.skip=true
+```
+
+8 JUnit 5 tests (`simulator/src/test/java/peersim/kademlia/DasChunkingTest.java`), run by GitHub Actions on every push. They cover the dissertation code only:
+
+- **Chunking:** chunk count is ceil(size / 1024); the same input gives the same keys in the same order; each key is the SHA-256 of the 4-byte offset plus the chunk; the chunks reassemble to the input; repeated content at different offsets gets different keys.
+- **Replication:** the expected ACK count is (chunks + 1) x K, which is 921,636 for the 25 MiB value with K = 36.
+- **Random-sample GET:** the sample has exactly the requested number of distinct keys, all taken from the stored key list; fewer than 1,023 chunks throws (the known limit above).
+
+To make these testable without building a PeerSim network, the chunking, ACK-count and sampling logic in `KademliaProtocol` was moved into small package-private static methods (`chunk`, `expectedAcks`, `sampleKeys`) that the protocol calls; behaviour is unchanged. Beyond the tests, the checks are the build, the 500-node run above and the comparison with the compiled build in [`docs/RECOVERY.md`](docs/RECOVERY.md).
 
 ## Credits and licence
 
