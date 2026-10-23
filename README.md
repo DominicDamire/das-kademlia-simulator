@@ -4,7 +4,7 @@ BSc dissertation project, Lancaster University, 2025. It simulates DAS-style chu
 
 Author: Damire Zalyatov
 
-> **This is a fork of [datahop/kademlia-simulator](https://github.com/datahop/kademlia-simulator)**, a Kademlia simulator built on PeerSim from the Kademlia implementation of Daniele Furlan and Maurizio Bonani. The base is upstream commit [`2ef9f79`](https://github.com/datahop/kademlia-simulator/commit/2ef9f79279af3de1673966b492cdc4eedd7cbe3b) (branch `put_get`). All other source files are theirs, unchanged. The dissertation work is on the **`das-sampling`** branch only ([diff against the base](https://github.com/d14life/das-kademlia-simulator/compare/2ef9f79279af3de1673966b492cdc4eedd7cbe3b...das-sampling)); the other branches are copies of upstream branches that every GitHub fork inherits.
+> **This is a fork of [datahop/kademlia-simulator](https://github.com/datahop/kademlia-simulator)**, a Kademlia simulator built on PeerSim from the Kademlia implementation of Daniele Furlan and Maurizio Bonani. The base is upstream commit [`2ef9f79`](https://github.com/datahop/kademlia-simulator/commit/2ef9f79279af3de1673966b492cdc4eedd7cbe3b) (branch `put_get`). All other source files are theirs, unchanged. The dissertation work is on the **`das-sampling`** branch only ([diff against the base](https://github.com/DominicDamire/das-kademlia-simulator/compare/2ef9f79279af3de1673966b492cdc4eedd7cbe3b...das-sampling)); the other branches are copies of upstream branches that every GitHub fork inherits.
 
 ![Left: GET latency over 11 GETs, 400 to 480 simulated ms. Right: messages sent by the PUT (2.77 million) and by an average GET (72.6 thousand).](docs/results.png)
 
@@ -86,7 +86,7 @@ Provenance of every file and how it was proven: [`docs/RECOVERY.md`](docs/RECOVE
 You need JDK 21 and Maven (tested with OpenJDK 21.0.13 and Maven 3.9.11).
 
 ```shell
-git clone https://github.com/d14life/das-kademlia-simulator.git
+git clone https://github.com/DominicDamire/das-kademlia-simulator.git
 cd das-kademlia-simulator/simulator
 mvn -q package -DskipTests -Dfmt.skip=true
 ./run.sh config/kademlia_putget_small.cfg
