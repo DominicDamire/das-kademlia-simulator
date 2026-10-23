@@ -38,9 +38,9 @@ flowchart LR
 
 An unanswered request triggers a ping, and a peer that does not answer is removed from the routing table.
 
-## What Damir added
+## What I added
 
-The Kademlia routing and lookup, the put/get operations, churn, transport delays and the observer framework are upstream code that Damir configured. His additions are in `simulator/src/main/java/peersim/kademlia/`, `simulator/config/kademlia_putget.cfg` and `simulator/run.sh`:
+The Kademlia routing and lookup, the put/get operations, churn, transport delays and the observer framework are upstream code that I configured. My additions are in `simulator/src/main/java/peersim/kademlia/`, `simulator/config/kademlia_putget.cfg` and `simulator/run.sh`:
 
 - **Chunking.** A 25 MiB value (26,214,400 random hex characters, generated in `TrafficGeneratorPutGet`) is cut into 25,600 chunks of 1 KiB. Each chunk is keyed by the SHA-256 of its 4-byte offset and its bytes. The list of all chunk keys is stored as metadata under SHA-256("t1").
 - **PUT.** Every chunk is stored on the 36 closest nodes found by an iterative Kademlia lookup. Each node answers with an ACK, and the PUT time is recorded when all 921,636 ACKs ((25,600 chunks + 1 metadata object) x 36) have arrived.
@@ -48,7 +48,7 @@ The Kademlia routing and lookup, the put/get operations, churn, transport delays
 - **Liveness.** An unanswered request triggers a ping (`MSG_EMPTY`); a peer that does not answer with a `MSG_PONG` is removed from the routing table. This implements the timeout handler that upstream left commented out.
 - **Metrics.** GET, PUT and FIND timing stores, a `reset()` for them, and a new observer line (HOP, GET and PUT averages; FIND min, max and average).
 - **Upstream bug fix.** `KademliaObserver.writeMap` wrote an empty first column and dropped the last character of each CSV row. Fixed.
-- **Defaults and config.** K 16 to 36, MAXREPLACEMENT 10 to 20, FINDMODE 1 to 0. `kademlia_putget.cfg` is his saved config: 25,000 nodes, one simulated hour, a PUT at t=0 and a GET every 300 s, churn (`p_idle` 0.33, `p_add` 0.33, `p_rem` 0.34), a fixed 10 ms link delay, 256-bit ids. `run.sh` sets a 16 GB heap.
+- **Defaults and config.** K 16 to 36, MAXREPLACEMENT 10 to 20, FINDMODE 1 to 0. `kademlia_putget.cfg` is my saved config: 25,000 nodes, one simulated hour, a PUT at t=0 and a GET every 300 s, churn (`p_idle` 0.33, `p_add` 0.33, `p_rem` 0.34), a fixed 10 ms link delay, 256-bit ids. `run.sh` sets a 16 GB heap.
 
 Changed files: `KademliaProtocol`, `KademliaObserver`, `TrafficGeneratorPutGet`, `Util` (`SHA256(byte[])`), `GetOperation`, `Message` (three new message types), `Timeout`, `KademliaCommonConfig`. Malicious-node support (`isEvil`) exists upstream but is not used.
 
@@ -66,14 +66,8 @@ Wall time was 84-177 s on an Apple-silicon Mac (the slower run had other jobs ru
 
 ## Recovery note
 
-The original source folder of this project was lost. This repository is reconstructed from Damir's compiled build (VS Code Java build of 2025-10-04) plus his editor history (VS Code Local History):
-
-- `TrafficGeneratorPutGet.java`, `config/kademlia_putget.cfg` and `run.sh` come from the editor history, verbatim.
-- 7 Java files (`KademliaProtocol`, `KademliaObserver`, `Message`, `Util`, `Timeout`, `GetOperation`, `KademliaCommonConfig`) were decompiled from the compiled classes (CFR) and fixed by hand. **Their comments and formatting are lost**, so `git diff` against upstream also shows formatting and comment noise in these files.
-- The rebuilt sources compile back to his build: 140 of 148 classes are byte-identical. In the other 8 classes 132 of 139 methods have identical bytecode; the remaining 7 differ only in how local variables are laid out.
-- Every other file is upstream's.
-
-Provenance of every file and how it was proven: [`docs/RECOVERY.md`](docs/RECOVERY.md).
+The original source folder was lost, so part of this repository is reconstructed from my compiled build plus my editor history: 3 files verbatim, 7 Java files decompiled and fixed by hand (their comments and formatting are lost), and 140 of 148 classes byte-identical to my build.
+Provenance of every file and how it was checked: [`docs/RECOVERY.md`](docs/RECOVERY.md).
 
 ## Limits
 
